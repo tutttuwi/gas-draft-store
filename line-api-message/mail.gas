@@ -1,0 +1,18 @@
+function errorMail(func, msg, stack) {
+  Logger.log("メール送信処理 --- 開始");
+  const body = [
+  "LINE通知GASアプリでエラーが発生しました！",
+    `対象関数：${func}`,
+    `エラーメッセージ：${msg}`,
+    `エラースタック：${stack}`,
+  ];
+  MailApp.sendEmail({
+    to: 't.tsutsui9117@gmail.com',
+    subject: '【エラー】LINE通知GASアプリ',
+//    from: 'noreply@gmail.com',
+    noReply: true,
+    body: body.join("\r\n"),
+    name: 'GAS自動送信機能',
+  });
+  Logger.log("メール送信処理 --- 終了");
+}

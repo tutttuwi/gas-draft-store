@@ -1,0 +1,132 @@
+/**
+ *
+ * Controller Process
+ * ## 概要
+ *   - doGet,doPostの窓口処理用ファイルとして扱います。
+ *   - 汎用的な定数でなければ定義しても問題ありません。
+ *
+ *
+ */
+
+// チャネルアクセストークン
+const CHANNEL_ACCESS_TOKEN = "xxxxxxxxxxxxxxxxxx";
+
+// ==============================
+//            GET処理
+// ==============================
+/**
+ * doGet関数
+ */
+function doGet(e) {
+  var startTime = Date.now();
+  dbLogger("START doGet() -- ", "INFO", "doGet() START");
+  try {
+    doGetExecute(e);
+  } catch (e) {
+    dbLogger(e.stack, "ERROR", "doGet() stack");
+    dbLogger(e.message, "ERROR", "doGet() message");
+    errorMail("doGet", e.msg, e.stack);
+  } finally {
+    dbLogger("Fin doGet()", "INFO", "doGet() finally");
+  }
+  var endTime = Date.now();
+  dbLogger("END doGet() -- ", "INFO", "doGet() END");
+  dbLogger("PROC TIME -- " + getProcTime(startTime, endTime), "INFO", "doGet() PROCTIME");
+}
+
+/**
+ * doGetExecute関数
+ */
+function doGetExecute(e) {
+  // TODO: サービス呼び出し
+}
+
+// ==============================
+//            POST処理
+// ==============================
+/**
+ * doPost関数
+ */
+function doPost(e) {
+  var startTime = Date.now();
+  dbLogger("START doPost() -- ", "INFO", "doPost() START");
+  dbLogger(JSON.stringify(e), "INFO", "doPost() request");
+  try {
+    doPostExecute(e);
+  } catch(e) {
+    dbLogger(e.stack, "ERROR", "doPost() stack");
+    dbLogger(e.message, "ERROR", "doPost() message");
+    errorMail("doPost", e.msg, e.stack);
+  } finally {
+    dbLogger("Fin doPost()", "INFO", "doPost()");
+    var endTime = Date.now();
+    dbLogger("END doPost() -- ", "INFO", "doPost() END");
+    dbLogger("PROC TIME -- " + getProcTime(startTime, endTime), "INFO", "doPost() PROCTIME");
+  }
+  return responseSuccess();
+}
+/**
+ * doPostExecute関数
+ */
+function doPostExecute(e) {
+  var events = JSON.parse(e.postData.contents).events;
+  var proc = JSON.parse(e.postData.contents).proc;
+  if (events) {
+    // LINE API 処理判定
+    events.forEach(function(event) {
+      // 検証用リクエストの場合
+      if (isVerify(event)) {
+        return; // continue処理
+      }
+      // イベントがメッセージの受信だったとき
+      if(event.type == "message") {
+        intentJudge(event);
+      }
+      if(event.type == "follow") {
+        followFriend(event);
+      }
+      if(event.type == "unfollow") {
+        unfollowFriend(event);
+      }
+    });
+  } else {
+    // LINE API 処理以外（独自処理）
+    if (proc) {
+      if (proc.type == "xxxxx") {
+        // TODO: サービス呼び出し
+      } else {
+        throw new Error("エラー：予期しないリクエストを検知しました！proc.typeが存在しません。 リクエストされたproc.type : " + proc.type);
+      }
+    } else {
+      throw new Error("エラー：予期しないリクエストを検知しました！procオブジェクトが存在しません。");
+    }
+  }
+}
+
+/**
+ * LINE検証リクエストチェック
+ * 検証用リクエストは処理対象外にするために使用する
+ */
+function isVerify(event) {
+  const REPLY_TOKEN_FOR_VERIFY = ["00000000000000000000000000000000", "ffffffffffffffffffffffffffffffff"];
+  if (REPLY_TOKEN_FOR_VERIFY.indexOf(event.replyToken) >= 0) {
+    return true;
+  }
+  return false;
+}
+
+function responseSuccess() {
+  return ContentService
+  .createTextOutput({status: 200, message: 'success'})
+  .setMimeType(ContentService.MimeType.JSON);
+}
+
+function intentJudge(e) {
+  const HELLO_INTENT = ["おはよう","おやすみ"];
+  var text = e.message.text;
+  if (HELLO_INTENT.indexOf(text) >= 0) {
+    // TODO: サービス呼び出し
+  } else {
+    reply(event);
+  }
+}

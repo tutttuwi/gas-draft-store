@@ -1,0 +1,124 @@
+// ==============================
+//  デバッグ用関数領域
+// ==============================
+/**
+ * doGetのデバッグ用
+ */
+function dummyGet() {
+  var e = {
+    'parameter': {reqSeq: 1,searchType: "before",baseDate:"2020/1/24 0:06:00"}
+  };
+  var res = doGet(e);
+  var content = res.getContent();
+  var getData = JSON.parse(content);
+  Logger.log(getData);
+  Logger.log(getData['uu']);
+}
+/**
+ * doPostのデバッグ用
+ */
+function dummyPost() {
+  var e = {
+    parameter: {},
+    contextPath: "",
+    contentLength: 373,
+    queryString: "",
+    parameters: {},
+    postData: {
+      type: "text/plain",
+      length: 373,
+      contents:
+        '{"seq":10,"startDate":"2020/1/23 23:18:00","startDateString":"2020-01-23","startTimeString":"23:18","endDate":"2020/1/23 23:30:00","endDateString":"2020-01-23","endTimeString":"23:30","takeTimeString":"00:12","title":"TEST TITLE","body":"TEST BODY","bodyStatus":false,"isComplete":true,"createDt":"2020-01-23 23:18","updateDt":"2020-01-23 23:18"}',
+      name: "postData"
+    }
+  };
+  var res = doPost(e);
+  var content = res.getContent();
+  var getData = JSON.parse(content);
+  Logger.log(getData);
+  Logger.log(getData["uu"]);
+}
+
+// ==============================
+//  テスト用関数領域
+// ==============================
+
+function daoTest() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("sample");
+  var key = "male";
+  var label = "gender";
+
+  // SELECT テスト 
+  var rs = findByKey(sheet, {
+    "gender": "male",
+    "job": "student",
+  });
+
+  // DELETE テスト
+  var rs = deleteByKey(sheet, {
+    "gender": "male",
+    "job": "student",
+  });
+
+  // UPDATE テスト
+  var rs = updateByKey(sheet, {
+    "gender": "male",
+    "job": "teacher",
+  },{
+    "age": 50,
+    "job": "UPDATE テスト",
+  });
+
+  // INSERT テスト
+  var rs = insert(sheet, [
+    {
+      name: "登録テスト",
+      age: 22,
+      birth: "1991/10/01",
+      job: "engineer",
+      gender: "male",
+    }
+  ], 1);
+
+  Logger.log("result array : " + rs);
+  Logger.log("result : " + JSON.stringify(rs));
+}
+
+function test() {
+//  var ss = SpreadsheetApp.getActiveSpreadsheet();
+//  var sheet = ss.getSheetByName("replyToken");
+//  sheet.getRange(1, 1).setValue("test")
+  Logger.log(Utilities.formatDate(new Date(), 'Asia/Tokyo', 'YYYY-MM'));
+}
+function test2() {
+  Logger.log(isNaN("aaa"));
+  Logger.log(isNaN("1"));
+  Logger.log(isNaN(1));
+  const startTime = Date.now(); // 開始時間
+  for (let i = 0; i < 1001234; i++) {
+    // NOP
+  }
+       
+  const endTime = Date.now(); // 終了時間
+  
+  Logger.log(endTime - startTime); // 何ミリ秒かかったかを表示する
+  
+}
+
+function errorTest() {
+  try {
+    console.log("-------------");
+    throw new Error("message!! Error ocurred!!");
+  } catch(e) {
+    Logger.log("catch : " + e.stack);
+    Logger.log("catch : " + e.message);
+  } finally {
+    Logger.log("finally : through");    
+  }
+}
+
+function errorMailTest() {
+  errorMail("testFunc", "errorMsg", "errorStackTrace");
+}
+

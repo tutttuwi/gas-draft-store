@@ -1,0 +1,264 @@
+/**
+ *
+ * DB Access Utility
+ * ## 制約条件
+ *   - テーブル情報を格納するシートは、「１行目：カラム名（物理名）、２行目：カラム名（論理名）、３行目以降：データ」　となっている必要があります。
+ *   - １行目のカラム名（物理名）と合致しない条件を指定した場合エラーを返却します。
+ * 
+ *
+ */
+
+
+/**
+ * INSERT関数
+ * - 対象レコードを登録します。
+ * - シーケンスに使用できる列は数値の連番のみです。
+ * @param {Spreadsheet} sheet 検索対象シート
+ * @param {Object[]} values 登録対象情報
+ * @param {Integer} seqCol シーケンス列
+ * @return {Integer} 処理件数
+ */
+function insert(sheet, values, seqCol) {
+  if (!(sheet && values && seqCol)) throw new Error("必須項目エラー：insert()");
+  // 変数設定
+  var lastCol = sheet.getLastColumn();
+  var lastRow = sheet.getLastRow();
+  // 最終シーケンス取得
+  var lastSeq = getLastSeq(sheet, seqCol, lastRow);
+  // 対象キーに基づく値取得
+  var updCnt = 0;
+  var whereInsertAry = [];
+  for (let i = 0; i < values.length; i++) {
+    var whereInsert = getWhere(sheet, values[i], lastCol, lastRow);
+    whereInsert.push([seqCol, lastSeq]);
+    whereInsertAry.push(whereInsert);
+    lastSeq++;
+  }
+  var nextRow = lastRow + 1;
+  var insertCnt = 0;
+  for (let i = 0; i < whereInsertAry.length; i++) {
+    var whereInsert = whereInsertAry[i]
+    for (let j = 0; j < whereInsert.length; j++) {
+      var tarCol = whereInsert[j][0];
+      var tarVal = whereInsert[j][1];
+      Logger.log([ whereInsert[j], tarCol, tarVal ]);
+      sheet.getRange(nextRow, tarCol).setValue(tarVal);
+    }
+    nextRow++;
+    insertCnt++;
+  }
+  return insertCnt;
+}
+
+/**
+ * UPDATE関数
+ * - キー情報を基にテーブルを検索し、対象レコードを更新します。
+ * @param sheet Spreadsheet 検索対象シート
+ * @param __where Object 更新対象条件
+ * @param updValues Object 更新対象値
+ * @return Integer 処理件数
+ */
+function updateByKey(sheet, __where, updValues) {
+  if (!(sheet && __where && updValues)) throw new Error("必須項目エラー：updateByKey()");
+  // 変数設定
+  var lastCol = sheet.getLastColumn();
+  var lastRow = sheet.getLastRow();
+  // WHERE条件
+  var where = getWhere(sheet, __where, lastCol, lastRow);
+  // UPDATE対象カラム情報
+  var updWhere = getWhere(sheet, updValues, lastCol, lastRow);
+  // 対象キーに基づく値取得
+  var updCnt = 0;
+  for (let i = 3; i <= lastRow; i++) {
+    // where条件合致確認
+    var isMatch = true;
+    for (let j = 0; j < where.length; j++) {
+      var tarCol = where[j][0];
+      var tarVal = where[j][1];
+      var v = sheet.getRange(i, tarCol).getDisplayValue();
+      if (v == tarVal) {
+        // 合致した場合次へ
+        continue;
+      } else {
+        // １列でも合致しなければfalseを設定してfor文抜ける
+        isMatch = false;
+        break;
+      }
+    }
+    // where条件に合致した場合は値セット
+    if (isMatch) {
+      for (let k = 0; k < updWhere.length; k++) {
+        var tarCol = updWhere[k][0];
+        var tarVal = updWhere[k][1];
+        Logger.log([ updWhere[k], tarCol, tarVal ]);
+        sheet.getRange(i, tarCol).setValue(tarVal);
+      }
+      updCnt++; // 更新件数カウントアップ
+    }
+  }
+  Logger.log("updCnt : " + updCnt);
+  return updCnt;
+}
+
+/**
+ * DELETE関数
+ * - キー情報を基にテーブルを検索し、対象レコードを削除します。
+ * @param sheet Spreadsheet 検索対象シート
+ * @param __where Object 削除対象条件
+ * @return Integer 処理件数
+ */
+function deleteByKey(sheet, __where) {
+  if (!(sheet && __where)) throw new Error("必須項目エラー：deleteByKey()");  
+  // 変数設定
+  var lastCol = sheet.getLastColumn();
+  var lastRow = sheet.getLastRow();
+  
+  // WHERE条件
+  var where = getWhere(sheet, __where, lastCol, lastRow);
+
+  // 対象キーに基づく値取得
+  var delCnt = 0;
+  for (let i = 3; i <= lastRow; i++) {
+    // where条件合致確認
+    var isMatch = true;
+    for (let j = 0; j < where.length; j++) {
+      var tarCol = where[j][0];
+      var tarKey = where[j][1];
+      var v = sheet.getRange(i, tarCol).getDisplayValue();
+      if (v == tarKey) {
+        // 合致した場合次へ
+        continue;
+      } else {
+        // １列でも合致しなければfalseを設定してfor文抜ける
+        isMatch = false;
+        break;
+      }
+    }
+    // where条件に合致した場合は値セット
+    if (isMatch) {
+      sheet.deleteRow(i);
+      delCnt++; // 削除件数カウントアップ
+      i--; // 削除後は１行戻してあげる必要がある
+    }
+  }
+  Logger.log("delCnt : " + delCnt);
+  return delCnt;
+}
+
+/**
+ * SELECT関数
+ * - キー情報を基にテーブルを検索し、対象レコードを１件配列で返します。
+ * @param sheet Spreadsheet 検索対象シート
+ * @param __where Object 検索対象条件
+ * @param isOneRowOnly trueの場合1行取得
+ * @return Array 検索結果値（配列）
+ */
+function findByKey(sheet, __where, isOneRowOnly) {
+  if (!(sheet && __where)) throw new Error("必須項目エラー：findByKey()");  
+  // 変数設定
+  var isOneRowOnly = (isOneRowOnly == undefined) ? false : true;
+  var lastCol = sheet.getLastColumn();
+  var lastRow = sheet.getLastRow();
+  
+  // WHERE条件
+  var where = getWhere(sheet, __where, lastCol, lastRow);
+
+  // 対象キーに基づく値取得
+  var result = [];
+  for (let i = 3; i <= lastRow; i++) {
+    // where条件合致確認
+    var isMatch = true;
+    for (let j = 0; j < where.length; j++) {
+      var tarCol = where[j][0];
+      var tarKey = where[j][1];
+      var v = sheet.getRange(i, tarCol).getDisplayValue();
+      if (v == tarKey) {
+        // 合致した場合次へ
+        continue;
+      } else {
+        // １列でも合致しなければfalseを設定してfor文抜ける
+        isMatch = false;
+        break;
+      }
+    }
+    // where条件に合致した場合は値セット
+    if (isMatch) {
+      result.push(sheet.getRange(i, 1, 1, lastCol).getDisplayValues()[0]);
+      // 1行のみ返却する設定の場合for文抜ける
+      if (isOneRowOnly) break;
+    }
+  }
+  //Logger.log("result : " + JSON.stringify(result));
+  return result.length == 0 ? null : parseKeyValue(sheet, result, lastCol);
+}
+
+
+
+
+// =======================================================================================================================
+
+/**
+* 【補助関数】Key-Valueパーサー
+* - SELECT時にオブジェクトで返却するために作成
+*/
+function parseKeyValue(sheet, object, lastCol) {
+  var colNames = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+//  Logger.log(">>>>>> colNames : " + colNames);
+  var result = [];
+  for (let i = 0; i < object.length; i++) {
+//    Logger.log(">>>>>> i : " + i);
+    var obj = {};
+    for (let j = 0; j < colNames.length; j++) {
+//      Logger.log(">>>>>> j : " + j);
+//      Logger.log(">>>>>> object[i][j]" + object[i][j]);
+//      Logger.log(">>>>>> object[i][j]" + colNames[j]);
+      obj[colNames[j]] = object[i][j];
+    }
+    result.push(obj);
+  }
+  return result;
+}
+
+/**
+ * 【補助関数】検索対象のカラム位置を取得
+ */
+function __findTargetColum(sheet, label, lastCol, lastRow) {
+  var tarCol = null;
+  for (let iCol = 1; iCol <= lastCol; iCol++) {
+    var v = sheet.getRange(1, iCol).getDisplayValue();
+    if (v == label) {
+      tarCol = iCol;
+      break;
+    }
+  }
+  if (tarCol == null) {
+    throw new Error(`[ERROR] 対象カラムがありません。 [ ${label} ] 正しいカラム名を設定してください。`);
+  }
+  return tarCol;
+}
+
+/**
+ * 【補助関数】WHERE条件取得
+ */
+function getWhere(sheet, __where, lastCol, lastRow) {
+  var keys = Object.keys(__where);
+  var where = [];
+  for (let i = 0; i < keys.length; i++) {
+    var colIdx = __findTargetColum(sheet, keys[i], lastCol, lastRow);
+    where.push([colIdx, __where[keys[i]]]);
+  }
+  return where;
+}
+
+/**
+ * 【補助用関数】最大シーケンス番号取得
+ */
+function getLastSeq(sheet, seqCol, lastRow) {
+  var lastSeq = 0;
+  for (let i = 3; i <= lastRow; i++) {
+    var seq = sheet.getRange(i, seqCol).getValue();
+    if (isNaN(seq)) throw new Error(`数値でない値がシーケンス列に登録されています。データを修正してください。 シート：${sheet.getName()} 列：${seqCol}　行：${i}`);
+    if (seq > lastSeq) lastSeq = seq;
+  }
+  return lastSeq + 1;
+}

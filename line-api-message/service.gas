@@ -1,0 +1,95 @@
+
+/*
+ * オウム返しをする処理
+ */
+function reply(e) {
+  // 受信したメッセージをそのまま送信
+  var message = {
+    "replyToken" : e.replyToken,
+    "messages" : [
+      {
+        "type" : "text",
+        "text" : e.message.text
+      }
+    ]
+  };
+  // 送信のための諸準備
+  var replyData = {
+    "method" : "post",
+    "headers" : {
+      "Content-Type" : "application/json",
+      "Authorization" : "Bearer " + CHANNEL_ACCESS_TOKEN
+    },
+    "payload" : JSON.stringify(message),
+    "muteHttpExceptions": true,
+  };
+  dbLogger(JSON.stringify(replyData), "INFO", "replay() request");
+  // JSON形式でAPIにポスト
+  var res = UrlFetchApp.fetch("https://api.line.me/v2/bot/message/reply", replyData);
+  var resCode = res.getResponseCode();
+  var resBody = res.getContentText();
+  dbLogger(`resCode : ${resCode} --- resBody : ` + JSON.stringify(resBody), "INFO", "replay() response");
+
+}
+
+/**
+ * 友達登録（追加）
+ */
+function followFriend(event) {
+  console.log("[followFriend] event : " + JSON.stringify(event))
+  // ユーザ情報取得
+  var userId = event.source.userId;
+  var type = event.source.type;
+  var mode = event.mode;
+  // シート情報取得
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("friends");
+  var where = {
+    "user_id": userId,
+  }
+  var exist = findByKey(sheet, where);
+  console.log("[followFriend] exist : " + JSON.stringify(exist))
+  if (exist) {
+    var updCnt = updateByKey(sheet, where, {
+      "type": type,
+      "mode": mode,
+      "status": "active",
+      "dt_updated": Utilities.formatDate(new Date(), 'Asia/Tokyo', 'YYYY-MM-dd HH:mm:ss'),
+      "broadcast_permitted" : "FALSE",
+    });
+    console.log("[followFriend] updCnt : " + JSON.stringify(updCnt))
+  } else {
+    var insCnt = insert(sheet, [
+      {
+        user_id: userId,
+        type: type,
+        mode: mode,
+        status: "active",
+        dt_updated: Utilities.formatDate(new Date(), 'Asia/Tokyo', 'YYYY-MM-dd HH:mm:ss'),
+      }
+    ], 1);
+    console.log("[followFriend] insCnt : " + JSON.stringify(insCnt))
+  }
+}
+
+
+/**
+ * 友達削除（ブロック）
+ */
+function unfollowFriend(event) {
+  // ユーザ情報取得
+  var userId = event.source.userId;
+  // シート情報取得
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("friends");
+  var where = {
+    "user_id": userId,
+  }
+  var exist = findByKey(sheet, where);
+  if (exist) {
+    var rs = deleteByKey(sheet, where);
+  } else {
+    // NOP
+  }
+}
+

@@ -1,0 +1,35 @@
+/**
+ * DBログ関数
+ * log,error_log sheetにログ情報を出力するための関数
+ * @param msg String ログメッセージ情報
+ * @param level String ログレベル
+ * @param label String ログラベル
+ */
+function dbLogger(msg, level, label) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("log");
+  var values = [
+    {
+      level: level,
+      label: label,
+      msg: msg,
+      dt: getDtFmt()
+    }
+  ]
+  insert(sheet, values, 1);
+//  if (level == "ERROR") {
+//    var sheetError = ss.getSheetByName("log_error");
+//    insert(sheetError, values, 1);
+//  }
+}
+
+const DEFAULT_LOCALE = "Asia/Tokyo"
+
+function getDtFmt() {
+  return Utilities.formatDate(new Date(), DEFAULT_LOCALE, 'YYYY-MM-dd HH:mm:ss');
+}
+
+function getProcTime(start, end) {
+  var diff = end - start;
+  return (diff / 1000) + "Sec"
+}
